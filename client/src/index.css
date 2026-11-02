@@ -1,0 +1,209 @@
+@import "tailwindcss";
+
+:root {
+  font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+  color-scheme: dark;
+  --palette-deep: #06141B;
+  --palette-dark: #11212D;
+  --palette-mid-dark: #253745;
+  --palette-mid: #4A5C6A;
+  --palette-light: #9BA8AB;
+  --palette-bright: #CCD0CF;
+  --bg-app: var(--palette-deep);
+  --bg-header: var(--palette-dark);
+  --bg-surface: var(--palette-dark);
+  --bg-card: var(--palette-mid-dark);
+  --bg-card-hover: var(--palette-mid);
+  --border-subtle: var(--palette-mid-dark);
+  --border-card: var(--palette-mid);
+  --text-main: var(--palette-bright);
+  --text-secondary: var(--palette-light);
+  --text-muted: var(--palette-mid);
+  --scrollbar-track: var(--palette-deep);
+  --scrollbar-thumb: var(--palette-mid-dark);
+  --scrollbar-hover: var(--palette-mid);
+  --accent-primary: var(--palette-mid);
+  --accent-hover: var(--palette-mid-dark);
+  --accent-light: var(--palette-light);
+  --accent-glow: rgb(74 92 106 / 25%);
+  --color-black: var(--palette-deep);
+  --color-white: var(--palette-bright);
+
+  --color-slate-50: var(--palette-bright);
+  --color-slate-100: var(--palette-bright);
+  --color-slate-200: var(--palette-light);
+  --color-slate-300: var(--palette-light);
+  --color-slate-400: var(--palette-light);
+  --color-slate-500: var(--palette-mid);
+  --color-slate-600: var(--palette-mid);
+  --color-slate-700: var(--palette-mid-dark);
+  --color-slate-800: var(--palette-mid-dark);
+  --color-slate-900: var(--palette-dark);
+  --color-slate-950: var(--palette-deep);
+
+  --color-amber-200: var(--palette-bright);
+  --color-amber-300: var(--palette-light);
+  --color-amber-400: var(--palette-light);
+  --color-amber-500: var(--palette-mid);
+  --color-amber-600: var(--palette-mid);
+  --color-amber-900: var(--palette-dark);
+  --color-amber-950: var(--palette-deep);
+  --color-blue-200: var(--palette-bright);
+  --color-blue-300: var(--palette-light);
+  --color-blue-400: var(--palette-light);
+  --color-blue-500: var(--palette-mid);
+  --color-blue-600: var(--palette-mid);
+  --color-blue-800: var(--palette-mid-dark);
+  --color-blue-900: var(--palette-dark);
+  --color-blue-950: var(--palette-deep);
+  --color-cyan-300: var(--palette-light);
+  --color-cyan-400: var(--palette-light);
+  --color-cyan-500: var(--palette-mid);
+  --color-emerald-200: var(--palette-bright);
+  --color-emerald-300: var(--palette-light);
+  --color-emerald-400: var(--palette-light);
+  --color-emerald-500: var(--palette-mid);
+  --color-emerald-600: var(--palette-mid);
+  --color-emerald-700: var(--palette-mid-dark);
+  --color-emerald-800: var(--palette-mid-dark);
+  --color-emerald-900: var(--palette-dark);
+  --color-emerald-950: var(--palette-deep);
+  --color-indigo-400: var(--palette-light);
+  --color-indigo-500: var(--palette-mid);
+  --color-indigo-600: var(--palette-mid);
+  --color-indigo-950: var(--palette-deep);
+  --color-orange-400: var(--palette-light);
+  --color-orange-500: var(--palette-mid);
+  --color-orange-600: var(--palette-mid);
+  --color-purple-200: var(--palette-bright);
+  --color-purple-300: var(--palette-light);
+  --color-purple-400: var(--palette-light);
+  --color-purple-500: var(--palette-mid);
+  --color-purple-600: var(--palette-mid);
+  --color-purple-700: var(--palette-mid-dark);
+  --color-purple-800: var(--palette-mid-dark);
+  --color-purple-900: var(--palette-dark);
+  --color-purple-950: var(--palette-deep);
+  --color-red-200: var(--palette-bright);
+  --color-red-300: var(--palette-light);
+  --color-red-400: var(--palette-light);
+  --color-red-500: var(--palette-mid);
+  --color-red-600: var(--palette-mid);
+  --color-red-950: var(--palette-deep);
+  --color-rose-300: var(--palette-light);
+  --color-rose-400: var(--palette-light);
+  --color-rose-500: var(--palette-mid);
+  --color-rose-600: var(--palette-mid);
+  --color-rose-800: var(--palette-mid-dark);
+  --color-rose-900: var(--palette-dark);
+  --color-rose-950: var(--palette-deep);
+  --color-sky-200: var(--palette-bright);
+  --color-sky-300: var(--palette-light);
+  --color-sky-400: var(--palette-light);
+  --color-sky-500: var(--palette-mid);
+  --color-sky-600: var(--palette-mid);
+  --color-sky-900: var(--palette-dark);
+  --color-sky-950: var(--palette-deep);
+  --color-teal-400: var(--palette-light);
+  --color-teal-600: var(--palette-mid);
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+  min-height: 100vh;
+  background-color: var(--bg-app);
+  color: var(--text-main);
+  transition: background-color 0.2s ease, color 0.2s ease;
+}
+
+.app-layout-root {
+  min-height: 100vh;
+  background-color: var(--bg-app);
+  color: var(--text-main);
+}
+
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--scrollbar-track);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--scrollbar-thumb);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--scrollbar-hover);
+}
+
+[class*="bg-[#"] {
+  background-color: var(--palette-mid-dark) !important;
+}
+
+[class*="bg-[#060b17]"],
+[class*="bg-[#050914]"] {
+  background-color: var(--palette-deep) !important;
+}
+
+[class*="bg-[#070d"],
+[class*="bg-[#070e"],
+[class*="bg-[#080f24]"] {
+  background-color: var(--palette-dark) !important;
+}
+
+[class*="bg-[#0b1226]"],
+[class*="bg-[#0e172e]"],
+[class*="bg-[#090f23]"],
+[class*="bg-[#0b162c]"],
+[class*="bg-[#0d1630]"] {
+  background-color: var(--palette-mid-dark) !important;
+}
+
+[class*="text-[#"] {
+  color: var(--palette-light) !important;
+}
+
+[class*="border-[#"] {
+  border-color: var(--palette-mid-dark) !important;
+}
+
+[class*="from-[#"] {
+  --tw-gradient-from: var(--palette-deep) var(--tw-gradient-from-position);
+  --tw-gradient-to: rgb(6 20 27 / 0%) var(--tw-gradient-to-position);
+  --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to);
+}
+
+[class*="via-[#"] {
+  --tw-gradient-via: var(--palette-dark) var(--tw-gradient-via-position);
+  --tw-gradient-to: rgb(17 33 45 / 0%) var(--tw-gradient-to-position);
+  --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-via), var(--tw-gradient-to);
+}
+
+[class*="to-[#"] {
+  --tw-gradient-to: var(--palette-mid) var(--tw-gradient-to-position);
+}
+
+@media print {
+  body * {
+    visibility: hidden;
+  }
+
+  #printable-label,
+  #printable-label * {
+    visibility: visible;
+  }
+
+  #printable-label {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    background: white !important;
+    color: black !important;
+  }
+}

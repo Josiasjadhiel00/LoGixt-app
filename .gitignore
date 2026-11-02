@@ -1,0 +1,34 @@
+# Dependencias
+node_modules/
+package-lock.json.bak
+
+# Compilación y builds
+client/dist/
+dist/
+
+# Variables de entorno y secretos (NUNCA SUBIR A GIT)
+.env*
+!.env.example
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Bases de datos locales y temporales WAL (NUNCA SUBIR A GIT)
+# NOTA DE PRODUCCIÓN: En hosting cloud se debe usar un volumen persistente (ej: DB_PATH=/data/database.sqlite).
+# Se ignoran las bases de datos y sus archivos auxiliares.
+*.sqlite
+*.sqlite-*
+*.db
+
+# Copias de respaldo locales (pueden contener datos reales de empresas)
+server/backups/*
+!server/backups/.gitkeep
+
+# Archivos de sistema y editores
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/

@@ -1,0 +1,25 @@
+{
+  "name": "sistema-gestion-almacen-server",
+  "version": "1.0.0",
+  "description": "Backend API para Sistema de Gestión y Logística de Almacén",
+  "main": "src/app.js",
+  "type": "module",
+  "scripts": {
+    "start": "node src/app.js",
+    "dev": "node --watch src/app.js",
+    "seed": "node src/db/seed.js",
+    "migrate": "node src/db/migrate_saas.js",
+    "backup": "node src/scripts/backup.js",
+    "clean:demo": "node src/scripts/clean_demo_data.js",
+    "test:sync": "node test_sync_offline.cjs",
+    "test:google-drive": "node test_google_drive.cjs",
+    "test": "node test_backend.js"
+  },
+  "dependencies": {
+    "bcryptjs": "^3.0.3",
+    "cors": "^2.8.5",
+    "dotenv": "^17.3.1",
+    "express": "^4.21.2",
+    "jsonwebtoken": "^9.0.2"
+  }
+}

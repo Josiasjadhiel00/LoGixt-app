@@ -1,0 +1,24 @@
+{
+  "name": "sistema-gestion-logistica-almacen",
+  "version": "1.0.0",
+  "description": "Sistema de Gestión y Logística de Almacén Empresarial",
+  "main": "desktop/main.cjs",
+  "scripts": {
+    "build": "npm --prefix client run build",
+    "desktop": "npm run build && electron .",
+    "desktop:test": "node desktop/test-database-storage.cjs",
+    "start": "npm --prefix server start",
+    "server": "npm --prefix server start",
+    "dev:server": "npm --prefix server run dev",
+    "client": "npm --prefix client run dev",
+    "backup": "npm --prefix server run backup",
+    "clean:demo": "npm --prefix server run clean:demo",
+    "migrate": "npm --prefix server run migrate",
+    "seed": "npm --prefix server run seed",
+    "test": "npm --prefix server run test",
+    "install:all": "npm install && npm --prefix server install && npm --prefix client install"
+  },
+  "devDependencies": {
+    "electron": "^45.2.1"
+  }
+}
