@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import {
   CreditCard,
-  CheckCircle2,
   AlertTriangle,
   XCircle,
+  MessageCircle,
   Clock,
   Calendar,
   Layers,
@@ -16,23 +16,18 @@ import {
   ArrowRight
 } from 'lucide-react';
 import { api } from '../../services/api';
-import { sound } from '../../services/sound';
 
 interface MySubscriptionModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSuccessRenewal?: () => void;
 }
 
 export const MySubscriptionModal: React.FC<MySubscriptionModalProps> = ({
   isOpen,
   onClose,
-  onSuccessRenewal,
 }) => {
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
-  const [isProcessingPayment, setIsProcessingPayment] = useState(false);
-  const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   useEffect(() => {
@@ -54,27 +49,6 @@ export const MySubscriptionModal: React.FC<MySubscriptionModalProps> = ({
     }
   };
 
-  const handleSimulatePayment = async () => {
-    setIsProcessingPayment(true);
-    setErrorMessage(null);
-    setSuccessMessage(null);
-
-    try {
-      const res = await api.subscriptions.simulatePayment();
-      sound.playSuccess();
-      setSuccessMessage(res.message);
-      await loadData();
-      if (onSuccessRenewal) {
-        onSuccessRenewal();
-      }
-    } catch (err: any) {
-      sound.playError();
-      setErrorMessage(err.message || 'Error procesando el pago.');
-    } finally {
-      setIsProcessingPayment(false);
-    }
-  };
-
   if (!isOpen) return null;
 
   const sub = data?.subscription;
@@ -86,6 +60,18 @@ export const MySubscriptionModal: React.FC<MySubscriptionModalProps> = ({
     sub?.suscripcion_estado === 'CANCELED';
 
   const isPastDue = sub?.suscripcion_estado === 'PAST_DUE' || sub?.en_periodo_gracia;
+  const whatsappNumber = (import.meta.env.VITE_WHATSAPP_NUMBER || '').replace(/\D/g, '');
+  const whatsappMessage = encodeURIComponent(
+    [
+      'Hola, quiero recibir los datos para pagar manualmente mi suscripción de Logixt.',
+      `Empresa: ${sub?.empresa_nombre || 'No especificada'}`,
+      `Plan: ${sub?.plan_nombre || 'No especificado'}`,
+      sub?.plan_precio != null ? `Monto: $${sub.plan_precio} USD` : null,
+    ].filter(Boolean).join('\n')
+  );
+  const whatsappUrl = /^\d{8,15}$/.test(whatsappNumber)
+    ? `https://wa.me/${whatsappNumber}?text=${whatsappMessage}`
+    : null;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 backdrop-blur-md p-4 animate-fade-in font-sans">
@@ -122,13 +108,6 @@ export const MySubscriptionModal: React.FC<MySubscriptionModalProps> = ({
           ) : (
             <>
               {/* Alertas de Notificación */}
-              {successMessage && (
-                <div className="p-4 bg-emerald-950/80 border border-emerald-500/50 rounded-2xl flex items-center space-x-3 text-emerald-300 text-xs font-semibold shadow-lg">
-                  <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0" />
-                  <span className="flex-1">{successMessage}</span>
-                </div>
-              )}
-
               {errorMessage && (
                 <div className="p-4 bg-red-950/80 border border-red-500/50 rounded-2xl flex items-center space-x-3 text-red-300 text-xs font-semibold shadow-lg">
                   <XCircle className="w-5 h-5 text-red-400 shrink-0" />
@@ -251,26 +230,29 @@ export const MySubscriptionModal: React.FC<MySubscriptionModalProps> = ({
                 )}
               </div>
 
-              {/* Botón de Pago / Renovación (SECCIÓN 12) */}
+              {/* Solicitud de instrucciones para pago manual */}
               <div className="p-4 bg-gradient-to-r from-[#0c1e36] to-[#0a232e] rounded-3xl border border-blue-500/30 flex flex-col sm:flex-row items-center justify-between gap-4">
                 <div>
-                  <h4 className="font-black text-white text-sm">
-                    {isSuspended ? 'Reactivar Servicio de Inmediato' : 'Renovar o Regularizar Suscripción'}
-                  </h4>
+                  <h4 className="font-black text-white text-sm">Pago manual por WhatsApp</h4>
                   <p className="text-[11px] text-slate-400 mt-0.5">
-                    Procesa el pago seguro de ${sub?.plan_precio || 79} USD para sumar +30 días a tu período de servicio.
+                    Solicita por WhatsApp los datos de cuenta y envía tu comprobante. La suscripción se actualizará después de confirmar el pago.
                   </p>
                 </div>
-
-                <button
-                  type="button"
-                  onClick={handleSimulatePayment}
-                  disabled={isProcessingPayment}
-                  className="px-6 py-3 bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs uppercase tracking-wider rounded-xl flex items-center space-x-2 shadow-xl shadow-emerald-950/50 transition cursor-pointer shrink-0 disabled:opacity-50"
-                >
-                  <CreditCard className="w-4 h-4" />
-                  <span>{isProcessingPayment ? 'Procesando Pago...' : 'Pagar / Renovar Servicio'}</span>
-                </button>
+                {whatsappUrl ? (
+                  <a
+                    href={whatsappUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="px-5 py-3 bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs uppercase tracking-wider rounded-xl inline-flex items-center gap-2 shadow-xl shadow-emerald-950/50 transition shrink-0"
+                  >
+                    <MessageCircle className="w-4 h-4" />
+                    Solicitar datos por WhatsApp
+                  </a>
+                ) : (
+                  <span className="px-4 py-2 rounded-xl border border-amber-500/30 bg-amber-950/40 text-amber-300 text-[10px] font-black uppercase tracking-wider shrink-0">
+                    WhatsApp no configurado
+                  </span>
+                )}
               </div>
 
               {/* 2. HISTORIAL DE PAGOS (SECCIÓN 12) */}

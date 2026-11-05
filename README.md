@@ -89,6 +89,8 @@ npm start
 La aplicación estará disponible inmediatamente en:
 👉 **`http://localhost:5000`**
 
+Para publicar el frontend por separado en **Vercel** y conservar la API/SQLite en un servicio persistente de **Render**, sigue la [guía de despliegue](./DEPLOYMENT.md#opción-b-frontend-en-vercel-y-api-en-render-configuración-elegida-para-logixt). El login JWT existente se conserva durante la transición; las cuentas con correo pueden autenticarse con Firebase Email/Password tras verificar la dirección y vincularla de forma única con el usuario local. Los roles y datos SaaS siguen en SQLite hasta completar las fases de migración descritas en la guía.
+
 ### 2. Web/PWA y modo sin conexión
 
 En un origen HTTPS (o `localhost` para desarrollo), la aplicación registra un service worker y puede instalarse como PWA. Tras una visita en línea, conserva los recursos de la aplicación y las respuestas GET autenticadas que se hayan consultado en ese navegador. Un usuario que ya inició sesión en ese dispositivo puede volver a abrir la aplicación sin conexión y consultar esos datos guardados.

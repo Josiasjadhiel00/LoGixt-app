@@ -121,6 +121,15 @@ export function updateProfile(req, res) {
     return res.status(400).json({ error: 'El nombre es obligatorio.' });
   }
 
+  if (
+    req.authProvider === 'firebase' &&
+    (typeof email !== 'string' || email.trim().toLowerCase() !== (req.user.email || '').trim().toLowerCase())
+  ) {
+    return res.status(400).json({
+      error: 'Para cambiar el correo de una cuenta Firebase, primero debe actualizarse y verificarse en Firebase Authentication.'
+    });
+  }
+
   try {
     db.prepare(`
       UPDATE usuarios SET
@@ -213,6 +222,12 @@ export function updatePreferences(req, res) {
 }
 
 export function changePassword(req, res) {
+  if (req.authProvider === 'firebase') {
+    return res.status(400).json({
+      error: 'Las cuentas Firebase deben cambiar su contraseña desde la sesión autenticada o mediante el enlace de recuperación.'
+    });
+  }
+
   const { contrasena_actual, contrasena_nueva } = req.body;
 
   if (!contrasena_actual || !contrasena_nueva) {

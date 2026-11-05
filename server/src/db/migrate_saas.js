@@ -101,6 +101,9 @@ export function runSaaSMigrations() {
   if (!columnExists('usuarios', 'empresa_id')) {
     db.exec('ALTER TABLE usuarios ADD COLUMN empresa_id INTEGER REFERENCES empresas(id)');
   }
+  if (!columnExists('usuarios', 'firebase_uid')) {
+    db.exec('ALTER TABLE usuarios ADD COLUMN firebase_uid TEXT');
+  }
   if (!columnExists('categorias', 'empresa_id')) {
     db.exec('ALTER TABLE categorias ADD COLUMN empresa_id INTEGER REFERENCES empresas(id)');
   }
@@ -113,6 +116,8 @@ export function runSaaSMigrations() {
 
   // 8. Crear índices para consultas multi-tenant ultrarrápidas
   db.exec(`
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_usuarios_firebase_uid
+      ON usuarios(firebase_uid) WHERE firebase_uid IS NOT NULL;
     CREATE INDEX IF NOT EXISTS idx_usuarios_empresa ON usuarios(empresa_id);
     CREATE INDEX IF NOT EXISTS idx_categorias_empresa ON categorias(empresa_id);
     CREATE INDEX IF NOT EXISTS idx_productos_empresa ON productos(empresa_id);

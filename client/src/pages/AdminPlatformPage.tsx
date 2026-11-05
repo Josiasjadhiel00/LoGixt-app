@@ -18,7 +18,6 @@ import {
   ArrowRight,
   TrendingUp,
   Settings,
-  Zap,
   Edit2,
   Lock,
   Unlock,
@@ -158,12 +157,6 @@ export const AdminPlatformPage: React.FC<AdminPlatformPageProps> = ({ onGoToWare
   const [diasGraciaInput, setDiasGraciaInput] = useState('5');
   const [savingConfig, setSavingConfig] = useState(false);
 
-  // Simulador de Webhooks
-  const [simTargetEmpresa, setSimTargetEmpresa] = useState<number>(1);
-  const [simEventType, setSimEventType] = useState('payment.succeeded');
-  const [simAmount, setSimAmount] = useState('79.00');
-  const [simMessage, setSimMessage] = useState<string | null>(null);
-  const [isSimulating, setIsSimulating] = useState(false);
 
   useEffect(() => {
     loadAll();
@@ -442,26 +435,6 @@ export const AdminPlatformPage: React.FC<AdminPlatformPageProps> = ({ onGoToWare
       alert(err.message || 'Error al guardar configuración.');
     } finally {
       setSavingConfig(false);
-    }
-  };
-
-  const handleSimulateWebhook = async () => {
-    setIsSimulating(true);
-    setSimMessage(null);
-    try {
-      const res = await api.webhooks.simulate({
-        type: simEventType,
-        empresa_id: simTargetEmpresa,
-        amount: parseFloat(simAmount) || 79.0
-      });
-      sound.playSuccess();
-      setSimMessage(res.message);
-      await loadAll();
-    } catch (err: any) {
-      sound.playError();
-      setSimMessage(`Error: ${err.message}`);
-    } finally {
-      setIsSimulating(false);
     }
   };
 
@@ -1740,54 +1713,11 @@ export const AdminPlatformPage: React.FC<AdminPlatformPageProps> = ({ onGoToWare
               </div>
             </div>
 
-            {/* Simulador de Webhooks */}
-            <div className="p-6 bg-[#0b1226] border border-slate-800 rounded-3xl space-y-4">
-              <h3 className="text-sm font-black text-white flex items-center space-x-2">
-                <Zap className="w-4 h-4 text-purple-400" />
-                <span>Simulador de Webhooks de Pasarela</span>
-              </h3>
-
-              <div className="space-y-3 text-xs">
-                <div>
-                  <label className="text-[10px] font-bold text-slate-400 uppercase block mb-1">Empresa Destino</label>
-                  <select
-                    value={simTargetEmpresa}
-                    onChange={(e) => setSimTargetEmpresa(Number(e.target.value))}
-                    className="w-full px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-white"
-                  >
-                    {empresas.map((e) => (
-                      <option key={e.id} value={e.id}>{e.nombre}</option>
-                    ))}
-                  </select>
-                </div>
-
-                <div>
-                  <label className="text-[10px] font-bold text-slate-400 uppercase block mb-1">Tipo de Evento</label>
-                  <select
-                    value={simEventType}
-                    onChange={(e) => setSimEventType(e.target.value)}
-                    className="w-full px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-white"
-                  >
-                    <option value="payment.succeeded">payment.succeeded (Aprobado +30 días)</option>
-                    <option value="payment.failed">payment.failed (Fallo en cobro)</option>
-                    <option value="subscription.canceled">subscription.canceled (Cancelada)</option>
-                  </select>
-                </div>
-
-                <button
-                  onClick={handleSimulateWebhook}
-                  disabled={isSimulating}
-                  className="w-full py-2.5 bg-purple-600 hover:bg-purple-500 text-white font-black rounded-xl text-xs transition cursor-pointer"
-                >
-                  {isSimulating ? 'Simulando...' : 'Disparar Webhook'}
-                </button>
-
-                {simMessage && (
-                  <p className="p-3 bg-slate-900 border border-slate-800 rounded-xl text-[11px] text-purple-300">
-                    {simMessage}
-                  </p>
-                )}
-              </div>
+            <div className="p-6 bg-[#0b1226] border border-amber-500/30 rounded-3xl">
+              <h3 className="text-sm font-black text-amber-300">Procesamiento de pagos deshabilitado</h3>
+              <p className="text-xs text-slate-400 mt-2">
+                Configura un proveedor de pagos antes de habilitar cobros, renovaciones o webhooks.
+              </p>
             </div>
           </div>
         )}

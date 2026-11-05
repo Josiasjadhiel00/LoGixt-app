@@ -149,19 +149,76 @@ sudo certbot --nginx -d logixt.tu-dominio.com
 
 ---
 
-### Opción B: Despliegue en PaaS (Render, Railway, Fly.io)
+### Opción B: Frontend en Vercel y API en Render (configuración elegida para LOGIXT)
 
-Si despliega en plataformas en la nube tipo PaaS:
+El frontend React/Vite se publica como sitio estático en Vercel. La API Express y SQLite se ejecutan juntas en un Web Service de Render con un disco persistente. **No despliegue la API como función serverless de Vercel**: `node:sqlite`, el modo WAL y los archivos JSON de respaldo necesitan almacenamiento persistente.
 
-1. **Persistencia Obligatoria**: Cree y conecte un **Persistent Disk / Volume** (por ejemplo, montado en `/data`).
-2. Configure la variable: `DB_PATH=/data/database.sqlite`.
-3. Configure el comando de build: `npm run build`.
-4. Configure el comando de inicio: `npm start`.
-5. Asegúrese de configurar las variables de entorno en el panel de control de la plataforma.
+#### 1. Publicar la API en Render
+
+1. Cree un **Web Service** desde el repositorio privado `Josiasjadhiel00/LoGixt-app` y autorice su acceso a GitHub.
+2. Seleccione Node como runtime, la rama `main` y el directorio raíz `server`.
+3. Use `npm ci` como comando de instalación y `npm start` como comando de inicio. Seleccione Node **24.x** o superior compatible con `node:sqlite`.
+4. Añada un **Persistent Disk** montado en `/var/data`. La base de datos y los respaldos no deben quedar en el filesystem efímero del servicio.
+5. Configure en **Environment**:
+
+   | Variable | Valor |
+   | --- | --- |
+   | `NODE_ENV` | `production` |
+   | `CLIENT_URL` | `https://lo-gixt-app.vercel.app` |
+   | `DB_PATH` | `/var/data/database.sqlite` |
+   | `BACKUPS_DIR` | `/var/data/backups` |
+   | `SEED_DEMO_DATA` | `false` |
+   | `JWT_SECRET` | Secreto aleatorio nuevo generado para producción; nunca reutilizar el ejemplo |
+   | `SUPERADMIN_INITIAL_PASSWORD` | Contraseña inicial fuerte si la instalación aún necesita crear el SuperAdmin |
+   | `FIREBASE_PROJECT_ID` | `logixt-59b8c` |
+   | `FIREBASE_SERVICE_ACCOUNT_JSON` | JSON privado de una cuenta de servicio del proyecto Firebase; guardarlo solo como secreto de Render |
+
+   Render asigna `PORT`; no fijes el puerto a un valor local. Mantén una sola instancia de la API para SQLite. Guarda todos los valores en el panel de Render, no en GitHub.
+6. Despliega y comprueba `https://logixt-api.onrender.com/api/health`. Debe responder `200` y `"database":"connected"`.
+
+#### 2. Publicar el frontend en Vercel
+
+1. Importa el mismo repositorio privado `Josiasjadhiel00/LoGixt-app` en Vercel.
+2. Configura **Root Directory** como `client`; deja el framework en Vite. El build es `npm run build` y el directorio de salida `dist`.
+3. Configure estas variables públicas de Firebase en **Production**:
+
+   | Variable | Valor |
+   | --- | --- |
+   | `VITE_API_URL` | `https://logixt-api.onrender.com/api` |
+   | `VITE_FIREBASE_API_KEY` | La clave pública de la aplicación web Firebase |
+   | `VITE_FIREBASE_AUTH_DOMAIN` | `logixt-59b8c.firebaseapp.com` |
+   | `VITE_FIREBASE_PROJECT_ID` | `logixt-59b8c` |
+   | `VITE_FIREBASE_APP_ID` | El ID público de la aplicación web Firebase |
+   | `VITE_FIREBASE_MESSAGING_SENDER_ID` | El ID público del remitente Firebase |
+   | `VITE_FIREBASE_STORAGE_BUCKET` | `logixt-59b8c.firebasestorage.app` |
+   | `VITE_WHATSAPP_NUMBER` | Número comercial de WhatsApp en formato internacional, solo dígitos; por ejemplo `18494259671` |
+
+   La configuración de Firebase Web y el número de WhatsApp de atención son públicos y se incorporan al bundle; no añada la cuenta de servicio ni claves privadas a Vercel. La URL de API también tiene un valor predeterminado en el cliente, pero puede sobreescribirse con `VITE_API_URL`.
+4. Abre la URL de producción, inicia sesión y verifica lectura/escritura, creación y descarga de respaldos, y la consola de red del navegador.
+
+#### 3. CORS y dominio
+
+`CLIENT_URL` debe coincidir exactamente con `https://lo-gixt-app.vercel.app` e incluir `https://` sin una ruta como `/login`. El backend solo permite ese origen en producción; las URLs Preview de Vercel no quedan habilitadas automáticamente. Para probar previews, usa un entorno de staging de API y configura allí el origen preview correspondiente; no abras CORS a cualquier dominio.
+
+#### 4. Datos y autenticación actuales
+
+La autenticación admite una transición gradual: se conserva el login existente de usuario/contraseña con JWT, y las cuentas con correo se autentican mediante Firebase Email/Password. El backend verifica el ID token con Firebase Admin, exige correo verificado y vincula la identidad por un correo coincidente y no ambiguo; los roles y la empresa siguen leyéndose desde SQLite durante esta etapa. No se migran hashes de contraseña a Firebase. Antes de habilitar el acceso Firebase, configure la cuenta de servicio privada en Render y asegure que cada correo de la base corresponde a una cuenta Firebase verificada. Las operaciones de usuarios/empresas todavía no se han migrado a Firestore.
+
+Los pagos se gestionan manualmente por WhatsApp: el botón de suscripción abre un mensaje prellenado para solicitar los datos de cuenta y enviar el comprobante. Configura `VITE_WHATSAPP_NUMBER` en Vercel con el número comercial internacional, solo dígitos. La renovación requiere confirmación manual; `/api/webhooks/payments`, `/api/webhooks/simulate` y `/api/subscriptions/simulate-payment` siguen respondiendo `503` con `PAYMENTS_DISABLED` y no renuevan ni reactivan suscripciones automáticamente.
+
+No importes `server/.env`, `database.sqlite`, sus archivos WAL, ni respaldos a GitHub. Para conservar datos locales, genera y valida una copia consistente de la base y planifica una transferencia segura al disco persistente de Render antes de abrir la aplicación al público. No empieces con una base vacía si necesitas conservar empresas, usuarios e inventario; los snapshots JSON por empresa no sustituyen por sí solos a una migración de toda la base SaaS.
+
+#### 5. Google Drive
+
+La conexión Drive se configura solo en Render, no en Vercel. Añade allí `GOOGLE_OAUTH_CLIENT_ID`, `GOOGLE_OAUTH_CLIENT_SECRET`, `GOOGLE_OAUTH_REDIRECT_URI`, `GOOGLE_DRIVE_TOKEN_ENCRYPTION_KEY` y el `CLIENT_URL` HTTPS final. Registra como callback OAuth la URL exacta `https://<servicio>.onrender.com/api/storage/google-drive/callback`. Mantén las variables vacías hasta haber creado y configurado la aplicación OAuth en Google Cloud.
+
+### Opción C: Despliegue en otros PaaS (Railway, Fly.io)
+
+Si despliega en otra plataforma PaaS, mantenga la API en un servicio Node persistente y cree un volumen para SQLite y respaldos. Configure `DB_PATH` y `BACKUPS_DIR` con rutas absolutas dentro del volumen. No use el filesystem efímero ni más de una instancia escribiendo en el mismo archivo SQLite.
 
 ---
 
-### Opción C: Despliegue con Docker y Docker Compose
+### Opción D: Despliegue con Docker y Docker Compose
 
 Si prefiere ejecutar mediante contenedores Docker:
 

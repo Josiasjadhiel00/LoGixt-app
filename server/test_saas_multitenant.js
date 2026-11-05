@@ -32,7 +32,6 @@ async function runTests() {
   // Asegurar estado activo inicial para idempotencia de pruebas
   db.prepare("UPDATE empresas SET estado = 'ACTIVA'").run();
   db.prepare("UPDATE suscripciones SET estado = 'ACTIVE'").run();
-  db.prepare("DELETE FROM pagos WHERE payment_id LIKE 'test_webhook_tx%'").run();
 
   // Esperar a que el servidor esté activo
   await new Promise(resolve => setTimeout(resolve, 600));
@@ -108,6 +107,37 @@ async function runTests() {
   assert(emp2Login.data.user.empresa_id === 2, 'Empresa ID de admin_andina debe ser 2');
   const emp2Token = emp2Login.data.token;
 
+  console.log('\n[4/6] Verificando que solo SuperAdmin pueda simular pagos...');
+  const anonymousSimulation = await req('/api/webhooks/simulate', {
+    method: 'POST',
+    body: { type: 'payment.succeeded', empresa_id: 2, amount: 79.00 }
+  });
+  assert(anonymousSimulation.status === 401, 'La simulación de pago debe requerir autenticación.');
+
+  const tenantSimulation = await req('/api/webhooks/simulate', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${emp2Token}` },
+    body: { type: 'payment.succeeded', empresa_id: 2, amount: 79.00 }
+  });
+  assert(tenantSimulation.status === 403, 'Un administrador de empresa no debe poder simular pagos globales.');
+
+  const superAdminSimulation = await req('/api/webhooks/simulate', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${saToken}` },
+    body: { type: 'payment.succeeded', empresa_id: 2, amount: 79.00 }
+  });
+  assert(superAdminSimulation.status === 503, 'El simulador de pagos debe permanecer deshabilitado.');
+  assert(superAdminSimulation.data.code === 'PAYMENTS_DISABLED', 'El simulador debe indicar que los pagos están deshabilitados.');
+  console.log('  ✔ Simulación de pagos deshabilitada hasta configurar un proveedor.');
+
+  const tenantPaymentSimulation = await req('/api/subscriptions/simulate-payment', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${emp2Token}` },
+    body: {}
+  });
+  assert(tenantPaymentSimulation.status === 503, 'La simulación de pago de una empresa debe permanecer deshabilitada.');
+  assert(tenantPaymentSimulation.data.code === 'PAYMENTS_DISABLED', 'La simulación de pago debe indicar que está deshabilitada.');
+
   const emp2Products = await req('/api/products', {
     headers: { Authorization: `Bearer ${emp2Token}` }
   });
@@ -147,21 +177,22 @@ async function runTests() {
   assert(blockedProducts.data.code === 'TENANT_SUSPENDED', `Código de error esperado TENANT_SUSPENDED, se obtuvo ${blockedProducts.data.code}`);
   console.log('  ✔ Bloqueo operativo verificado: Retorna 403 TENANT_SUSPENDED.');
 
-  // Comprobar que la ruta de consulta de suscripción SIGUE disponible para pagar/ver estado
+  // Comprobar que la ruta de consulta de suscripción SIGUE disponible para consultar el estado
   const subCheckWhileSuspended = await req('/api/subscriptions/my-subscription', {
     headers: { Authorization: `Bearer ${emp2Token}` }
   });
   assert(subCheckWhileSuspended.status === 200, 'La ruta de suscripción debe seguir accesible cuando está suspendida');
   assert(subCheckWhileSuspended.data.subscription.empresa_estado === 'SUSPENDIDA', 'El estado de la empresa debe ser SUSPENDIDA');
-  console.log('  ✔ Acceso a "Mi Suscripción" permitido durante suspensión para que el cliente pueda regularizar su cuenta.');
+  const subscriptionStatusBeforeWebhook = subCheckWhileSuspended.data.subscription.suscripcion_estado;
+  console.log('  ✔ Acceso a "Mi Suscripción" permitido durante suspensión para consultar el estado.');
 
   // Comprobar que los datos de Empresa 2 NO han sido eliminados de la base de datos
   const dbEmp2Count = db.prepare('SELECT COUNT(*) as count FROM productos WHERE empresa_id = 2').get().count;
   assert(dbEmp2Count === emp2List.length, 'Los datos de la empresa NO deben ser eliminados al suspenderse');
   console.log(`  ✔ Integridad de datos preservada: Todos los ${dbEmp2Count} productos de Empresa 2 permanecen intactos.`);
 
-  // 6. Verificación de Webhook y Restauración Inmediata
-  console.log('\n[6/6] Verificando webhook de pago y reactivación inmediata del servicio...');
+  // 6. Verificar que un webhook sin proveedor configurado no cambie suscripciones
+  console.log('\n[6/6] Verificando que el webhook de pago permanezca deshabilitado...');
   const webhookRes = await req('/api/webhooks/payments', {
     method: 'POST',
     body: {
@@ -173,31 +204,23 @@ async function runTests() {
       }
     }
   });
-  assert(webhookRes.status === 200, `Webhook falló con status ${webhookRes.status}`);
-  assert(webhookRes.data.status === 'success', 'El webhook no reportó status success');
-  console.log('  ✔ Webhook payment.succeeded procesado exitosamente.');
+  assert(webhookRes.status === 503, `El webhook debe estar deshabilitado; recibió status ${webhookRes.status}`);
+  assert(webhookRes.data.code === 'PAYMENTS_DISABLED', 'El webhook debe indicar que los pagos están deshabilitados.');
+  console.log('  ✔ Webhook rechazado y suscripción suspendida sin cambios.');
 
-  // Verificar que el acceso a los productos de Empresa 2 se restableció de inmediato
+  // Verificar que el webhook no reactivó la empresa
   const restoredProducts = await req('/api/products', {
     headers: { Authorization: `Bearer ${emp2Token}` }
   });
-  assert(restoredProducts.status === 200, `Acceso no restaurado tras pago: status ${restoredProducts.status}`);
-  const restoredList = restoredProducts.data.products || [];
-  console.log(`  ✔ Restauración inmediata confirmada: Empresa 2 vuelve a tener acceso a sus ${restoredList.length} productos.`);
+  assert(restoredProducts.status === 403, `La empresa debe continuar suspendida; recibió status ${restoredProducts.status}`);
+  console.log('  ✔ La empresa permanece bloqueada tras el webhook deshabilitado.');
 
-  // Verificar estado activo en "Mi Suscripción"
+  // Verificar que la suscripción no cambió
   const restoredSub = await req('/api/subscriptions/my-subscription', {
     headers: { Authorization: `Bearer ${emp2Token}` }
   });
-  assert(restoredSub.data.subscription.suscripcion_estado === 'ACTIVE', 'El estado de la suscripción debe ser ACTIVE');
-  assert(restoredSub.data.subscription.empresa_estado === 'ACTIVA', 'El estado de la empresa debe ser ACTIVA');
-  console.log(`  ✔ Estado de suscripción verificado: ACTIVA con fecha próximo pago: ${restoredSub.data.subscription.fecha_proximo_pago}.`);
-
-  // Verificar registro en webhook_logs
-  const log = db.prepare("SELECT * FROM webhook_logs WHERE evento = 'payment.succeeded' ORDER BY id DESC LIMIT 1").get();
-  assert(log !== undefined, 'No se registró el evento en webhook_logs');
-  assert(log.procesado === 1, 'El estado en webhook_logs debe ser procesado = 1');
-  console.log(`  ✔ Auditoría en webhook_logs verificada (ID de registro: ${log.id}).`);
+  assert(restoredSub.data.subscription.suscripcion_estado === subscriptionStatusBeforeWebhook, 'El webhook deshabilitado no debe cambiar la suscripción.');
+  assert(restoredSub.data.subscription.empresa_estado === 'SUSPENDIDA', 'El webhook deshabilitado no debe reactivar la empresa.');
 
   console.log('\n====================================================');
   console.log('🎉 ¡TODAS LAS PRUEBAS SAAS MULTI-TENANT PASARON CON ÉXITO!');

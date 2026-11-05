@@ -1,12 +1,12 @@
 import express from 'express';
-import { handleWebhook, simulateWebhook } from '../controllers/webhookController.js';
+import { authenticate } from '../middleware/auth.js';
+import { requireRole } from '../middleware/roles.js';
+import { paymentsDisabled } from '../middleware/paymentsDisabled.js';
 
 const router = express.Router();
 
-// Endpoint público para recibir webhooks de la pasarela de pagos
-router.post('/payments', handleWebhook);
+router.post('/payments', paymentsDisabled);
 
-// Endpoint de simulación para pruebas del sistema
-router.post('/simulate', simulateWebhook);
+router.post('/simulate', authenticate, requireRole('SUPERADMIN'), paymentsDisabled);
 
 export default router;

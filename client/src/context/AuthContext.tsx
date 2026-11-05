@@ -3,6 +3,12 @@ import { User } from '../types';
 import { api, ApiError } from '../services/api';
 import { isNetworkUnavailable } from '../services/localStorageDb';
 import { offlineDataRepository } from '../repositories/offlineDataRepository';
+import {
+  firebaseAuth,
+  FIREBASE_SESSION_TOKEN,
+  signOutFirebase
+} from '../services/firebase';
+import { onAuthStateChanged } from 'firebase/auth';
 
 interface AuthContextType {
   user: User | null;
@@ -21,6 +27,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [user, setUser] = useState<User | null>(null);
   const [token, setToken] = useState<string | null>(() => localStorage.getItem('wms_token'));
   const [isLoading, setIsLoading] = useState<boolean>(true);
+
+  useEffect(() => {
+    if (!firebaseAuth) return;
+
+    return onAuthStateChanged(firebaseAuth, (firebaseUser) => {
+      setIsLoading(true);
+      setToken(firebaseUser ? FIREBASE_SESSION_TOKEN : localStorage.getItem('wms_token'));
+    });
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -59,6 +74,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
           if (isInvalidToken) {
             localStorage.removeItem('wms_token');
+            void signOutFirebase().catch((error) => {
+              console.error('No se pudo cerrar la sesión de Firebase inválida:', error);
+            });
             setToken(null);
             offlineDataRepository.setActiveUser(null);
             setUser(null);
@@ -87,8 +105,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, [token]);
 
   const login = async (usuario: string, contrasena: string) => {
+    if (firebaseAuth && usuario.includes('@')) {
+      localStorage.removeItem('wms_token');
+    }
     const res = await api.auth.login(usuario, contrasena);
-    localStorage.setItem('wms_token', res.token);
+    if (res.token === FIREBASE_SESSION_TOKEN) {
+      localStorage.removeItem('wms_token');
+    } else {
+      localStorage.setItem('wms_token', res.token);
+    }
     setToken(res.token);
     setUser(res.user);
     try {
@@ -102,6 +127,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const logout = () => {
     const userId = user?.id;
     localStorage.removeItem('wms_token');
+    void signOutFirebase().catch((error) => {
+      console.error('No se pudo cerrar la sesión de Firebase:', error);
+    });
     setToken(null);
     setUser(null);
     offlineDataRepository.setActiveUser(null);

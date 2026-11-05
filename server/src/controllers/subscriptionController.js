@@ -1,4 +1,4 @@
-import db, { transaction } from '../db/connection.js';
+import db from '../db/connection.js';
 
 /**
  * 💳 Consultar la suscripción de la empresa del usuario actual ("Mi Suscripción")
@@ -86,73 +86,5 @@ export function getMySubscription(req, res) {
     });
   } catch (error) {
     return res.status(500).json({ error: 'Error al consultar datos de suscripción.', details: error.message });
-  }
-}
-
-/**
- * ⚡ Simular Pago / Renovación de suscripción inmediata
- */
-export function simulatePayment(req, res) {
-  const empresaId = req.user.rol === 'SUPERADMIN' && req.body.empresa_id
-    ? Number(req.body.empresa_id)
-    : req.user.empresa_id;
-
-  if (!empresaId) {
-    return res.status(400).json({ error: 'Empresa no especificada.' });
-  }
-
-  try {
-    const sub = db.prepare(`
-      SELECT s.*, p.precio, p.nombre as plan_nombre, e.nombre as empresa_nombre
-      FROM suscripciones s
-      JOIN planes p ON s.plan_id = p.id
-      JOIN empresas e ON s.empresa_id = e.id
-      WHERE s.empresa_id = ?
-      ORDER BY s.id DESC LIMIT 1
-    `).get(empresaId);
-
-    if (!sub) {
-      return res.status(404).json({ error: 'Suscripción no encontrada.' });
-    }
-
-    // Calcular nueva fecha de vencimiento (+30 días desde hoy o fecha actual)
-    const baseDate = new Date();
-    baseDate.setDate(baseDate.getDate() + 30);
-    const nuevaFecha = baseDate.toISOString().split('T')[0];
-    const paymentId = `pay_sim_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
-
-    transaction((db) => {
-      // 1. Actualizar suscripción a ACTIVE
-      db.prepare(`
-        UPDATE suscripciones SET
-          estado = 'ACTIVE',
-          fecha_proximo_pago = ?,
-          updated_at = CURRENT_TIMESTAMP
-        WHERE id = ?
-      `).run(nuevaFecha, sub.id);
-
-      // 2. Reactivar empresa si estaba suspendida
-      db.prepare(`
-        UPDATE empresas SET
-          estado = 'ACTIVA',
-          fecha_actualizacion = CURRENT_TIMESTAMP
-        WHERE id = ?
-      `).run(empresaId);
-
-      // 3. Registrar pago exitoso
-      db.prepare(`
-        INSERT INTO pagos (empresa_id, suscripcion_id, monto, moneda, estado, payment_id, metodo_pago)
-        VALUES (?, ?, ?, 'USD', 'PAGADO', ?, 'PAGO ONLINE SIMULADO (TARJETA)')
-      `).run(empresaId, sub.id, sub.precio, paymentId);
-    });
-
-    return res.json({
-      message: `¡Pago exitoso de $${sub.precio} USD procesado correctamente! Suscripción renovada hasta el ${nuevaFecha}.`,
-      payment_id: paymentId,
-      nueva_fecha: nuevaFecha,
-      estado: 'ACTIVE'
-    });
-  } catch (error) {
-    return res.status(500).json({ error: 'Error al procesar simulación de pago.', details: error.message });
   }
 }

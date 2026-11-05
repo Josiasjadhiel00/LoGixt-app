@@ -22,8 +22,17 @@ import {
 } from '../types';
 import { offlineDataRepository } from '../repositories/offlineDataRepository';
 import { getDeviceUuid, isNetworkUnavailable, PendingMovementMutation } from './localStorageDb';
+import {
+  changeFirebasePassword,
+  firebaseAuth,
+  FIREBASE_SESSION_TOKEN,
+  loginWithFirebase,
+  sendFirebasePasswordReset,
+  signOutFirebase
+} from './firebase';
 
-const API_BASE = import.meta.env.VITE_API_URL || '/api';
+const API_BASE = import.meta.env.VITE_API_URL ||
+  (import.meta.env.PROD ? 'https://logixt-api.onrender.com/api' : '/api');
 
 export class ApiError extends Error {
   status: number;
@@ -304,10 +313,24 @@ async function runSyncPendingMovementMutations(retryErrors: boolean): Promise<Sy
   return response;
 }
 
-async function request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
-  const token = localStorage.getItem('wms_token');
+async function getApiToken(): Promise<string | null> {
+  if (firebaseAuth) {
+    await firebaseAuth.authStateReady();
+    if (firebaseAuth.currentUser) {
+      return firebaseAuth.currentUser.getIdToken();
+    }
+  }
+  return localStorage.getItem('wms_token');
+}
+
+async function request<T>(
+  endpoint: string,
+  options: RequestInit = {},
+  tokenOverride?: string
+): Promise<T> {
   const method = (options.method || 'GET').toUpperCase();
   const cacheableGet = method === 'GET' && !endpoint.startsWith('/storage/google-drive/');
+  const token = tokenOverride || await getApiToken();
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
     'x-device-uuid': getDeviceUuid(),
@@ -361,7 +384,7 @@ async function request<T>(endpoint: string, options: RequestInit = {}): Promise<
 }
 
 async function downloadStorageBackup(id: number): Promise<{ fileName: string }> {
-  const token = localStorage.getItem('wms_token');
+  const token = await getApiToken();
   if (!token) throw new ApiError('Inicia sesión para descargar el respaldo.', 401);
 
   let response: Response;
@@ -441,11 +464,29 @@ function updateProductStockInResponse(value: unknown, productId: number, stock: 
 export const api = {
   // Autenticación y Perfil
   auth: {
-    login: (usuario: string, contrasena: string) =>
-      request<{ token: string; user: User; message: string }>('/auth/login', {
+    login: async (usuario: string, contrasena: string) => {
+      if (firebaseAuth && usuario.includes('@')) {
+        await loginWithFirebase(usuario.trim(), contrasena);
+        const token = await firebaseAuth.currentUser!.getIdToken();
+        try {
+          const response = await request<{ user: User }>('/auth/me', {}, token);
+          return {
+            token: FIREBASE_SESSION_TOKEN,
+            user: response.user,
+            message: 'Inicio de sesión exitoso.'
+          };
+        } catch (error) {
+          await signOutFirebase();
+          throw error;
+        }
+      }
+
+      return request<{ token: string; user: User; message: string }>('/auth/login', {
         method: 'POST',
         body: JSON.stringify({ usuario, contrasena }),
-      }),
+      });
+    },
+    sendPasswordReset: sendFirebasePasswordReset,
     me: () => request<{ user: User }>('/auth/me'),
     updateProfile: (data: { nombre: string; apellido?: string; email?: string; telefono?: string; foto?: string }) =>
       request<{ message: string; user: User }>('/auth/profile', {
@@ -458,10 +499,14 @@ export const api = {
         body: JSON.stringify(data),
       }),
     changePassword: (contrasena_actual: string, contrasena_nueva: string) =>
-      request<{ message: string }>('/auth/change-password', {
-        method: 'POST',
-        body: JSON.stringify({ contrasena_actual, contrasena_nueva }),
-      }),
+      firebaseAuth?.currentUser
+        ? changeFirebasePassword(contrasena_actual, contrasena_nueva).then(() => ({
+          message: 'Contraseña de Firebase actualizada exitosamente.'
+        }))
+        : request<{ message: string }>('/auth/change-password', {
+          method: 'POST',
+          body: JSON.stringify({ contrasena_actual, contrasena_nueva }),
+        }),
   },
 
   // Dashboard y Métricas de Almacén
@@ -803,23 +848,6 @@ export const api = {
         };
         payments: Pago[];
       }>('/subscriptions/my-subscription'),
-    simulatePayment: (empresa_id?: number) =>
-      request<{ message: string; payment_id: string; nueva_fecha: string; estado: string }>(
-        '/subscriptions/simulate-payment',
-        {
-          method: 'POST',
-          body: JSON.stringify({ empresa_id }),
-        }
-      ),
-  },
-
-  // ⚡ Webhooks y Simulador
-  webhooks: {
-    simulate: (data: { type: string; empresa_id: number; amount?: number }) =>
-      request<{ status: string; message: string }>('/webhooks/simulate', {
-        method: 'POST',
-        body: JSON.stringify(data),
-      }),
   },
 
   // 💾 Almacenamiento Local y Sincronización en la Nube

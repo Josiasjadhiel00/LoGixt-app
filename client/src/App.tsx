@@ -214,10 +214,6 @@ export const App: React.FC = () => {
         <MySubscriptionModal
           isOpen={isSubscriptionModalOpen}
           onClose={() => setIsSubscriptionModalOpen(false)}
-          onSuccessRenewal={() => {
-            triggerRefresh();
-            window.location.reload();
-          }}
         />
       </>
     );
@@ -425,9 +421,6 @@ export const App: React.FC = () => {
       <MySubscriptionModal
         isOpen={isSubscriptionModalOpen}
         onClose={() => setIsSubscriptionModalOpen(false)}
-        onSuccessRenewal={() => {
-          triggerRefresh();
-        }}
       />
 
       {/* Modal Perfil de Usuario y Personalización */}

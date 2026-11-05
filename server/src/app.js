@@ -50,14 +50,14 @@ app.use(cors({
   origin: (origin, callback) => {
     // Permitir peticiones sin origin (como herramientas internas, llamadas locales, o same-origin al servir la SPA)
     if (!origin) return callback(null, true);
-    if (allowedOrigins.length === 0 || allowedOrigins.includes(origin)) {
+    if (allowedOrigins.includes(origin)) {
       return callback(null, true);
     }
     // En desarrollo permitir cualquier localhost
     if (!isProd && origin.startsWith('http://localhost:')) {
       return callback(null, true);
     }
-    return callback(new Error(`Bloqueado por CORS: Origen ${origin} no autorizado.`));
+    return callback(null, false);
   },
   credentials: true
 }));
