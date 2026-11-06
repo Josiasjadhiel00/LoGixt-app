@@ -23,6 +23,9 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+// Tiempo máximo que se espera la validación de la sesión guardada antes de mostrar la interfaz.
+const SESSION_CHECK_MAX_WAIT_MS = 6000;
+
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
   const [token, setToken] = useState<string | null>(() => localStorage.getItem('wms_token'));
@@ -39,9 +42,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   useEffect(() => {
     let cancelled = false;
+    let releaseTimer: number | undefined;
 
     const initAuth = async () => {
       if (token) {
+        // Si el servidor tarda en responder (p. ej. Render despertando), no dejamos la app
+        // en la pantalla de carga: tras unos segundos se muestra la interfaz y, cuando
+        // /auth/me responda, la sesión se completa o se descarta sola.
+        releaseTimer = window.setTimeout(() => {
+          if (!cancelled) setIsLoading(false);
+        }, SESSION_CHECK_MAX_WAIT_MS);
+
         let cachedUser: User | null = null;
 
         try {
@@ -94,6 +105,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
       }
 
+      window.clearTimeout(releaseTimer);
       if (!cancelled) setIsLoading(false);
     };
 
@@ -101,6 +113,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     return () => {
       cancelled = true;
+      window.clearTimeout(releaseTimer);
     };
   }, [token]);
 
