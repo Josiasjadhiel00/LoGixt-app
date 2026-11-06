@@ -3,6 +3,7 @@ import jwt from 'jsonwebtoken';
 import db from '../db/connection.js';
 import { JWT_SECRET } from '../middleware/auth.js';
 import { logActivity } from '../utils/activityLogger.js';
+import { emailInUse, normalizeEmail, provisionFirebaseIdentity } from '../services/firebaseUsers.js';
 
 export function login(req, res) {
   const { usuario, contrasena } = req.body;
@@ -114,7 +115,7 @@ export function getProfile(req, res) {
   });
 }
 
-export function updateProfile(req, res) {
+export async function updateProfile(req, res) {
   const { nombre, apellido, email, telefono, foto } = req.body;
 
   if (!nombre || !nombre.trim()) {
@@ -130,6 +131,25 @@ export function updateProfile(req, res) {
     });
   }
 
+  const rawEmail = typeof email === 'string' ? email.trim() : '';
+  const normalizedEmail = rawEmail ? normalizeEmail(rawEmail) : null;
+  if (rawEmail && !normalizedEmail) {
+    return res.status(400).json({ error: 'El correo electrónico no es válido.' });
+  }
+
+  const stored = db.prepare('SELECT email, firebase_uid FROM usuarios WHERE id = ?').get(req.user.id);
+  const storedEmail = (stored?.email || '').trim().toLowerCase();
+
+  if (normalizedEmail && emailInUse(normalizedEmail, req.user.id)) {
+    return res.status(409).json({ error: 'Ese correo ya está registrado en otra cuenta.' });
+  }
+
+  if (stored?.firebase_uid && (normalizedEmail || '') !== storedEmail) {
+    return res.status(400).json({
+      error: 'Esta cuenta ya está vinculada a Firebase. El correo se cambia desde Firebase Authentication.'
+    });
+  }
+
   try {
     db.prepare(`
       UPDATE usuarios SET
@@ -142,7 +162,7 @@ export function updateProfile(req, res) {
     `).run(
       nombre.trim(),
       apellido ? apellido.trim() : null,
-      email ? email.trim() : null,
+      normalizedEmail,
       telefono ? telefono.trim() : null,
       foto ? foto.trim() : null,
       req.user.id
@@ -166,9 +186,22 @@ export function updateProfile(req, res) {
       ip_origen: req.ip
     });
 
+    // Si hay correo y la cuenta aún no tiene identidad en Firebase, se crea y se envía el correo.
+    let firebase = null;
+    if (normalizedEmail && !stored?.firebase_uid && req.authProvider !== 'firebase') {
+      firebase = await provisionFirebaseIdentity({
+        userId: req.user.id,
+        email: normalizedEmail,
+        displayName: [updated.nombre, updated.apellido].filter(Boolean).join(' ')
+      });
+    }
+
     return res.json({
-      message: 'Perfil actualizado exitosamente.',
-      user: updated
+      message: firebase
+        ? `Perfil actualizado exitosamente. ${firebase.message}`
+        : 'Perfil actualizado exitosamente.',
+      user: updated,
+      firebase
     });
   } catch (error) {
     return res.status(500).json({

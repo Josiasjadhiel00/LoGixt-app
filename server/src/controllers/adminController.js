@@ -5,6 +5,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import db, { transaction } from '../db/connection.js';
 import { logActivity } from '../utils/activityLogger.js';
+import { emailInUse, normalizeEmail, provisionFirebaseIdentity } from '../services/firebaseUsers.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -228,7 +229,7 @@ export function getAllEmpresas(req, res) {
 /**
  * ➕ Crear nueva empresa con plan y usuario administrador
  */
-export function createEmpresa(req, res) {
+export async function createEmpresa(req, res) {
   const {
     nombre,
     email,
@@ -238,11 +239,17 @@ export function createEmpresa(req, res) {
     admin_usuario,
     admin_contrasena
   } = req.body;
+  const rawAdminEmail = typeof req.body.admin_email === 'string' ? req.body.admin_email.trim() : '';
+  const adminEmail = rawAdminEmail ? normalizeEmail(rawAdminEmail) : null;
 
   if (!nombre || !email || !plan_id || !admin_usuario || !admin_contrasena) {
     return res.status(400).json({
       error: 'Nombre de empresa, email, plan, usuario admin y contraseña son obligatorios.'
     });
+  }
+
+  if (rawAdminEmail && !adminEmail) {
+    return res.status(400).json({ error: 'El correo del administrador no es válido.' });
   }
 
   try {
@@ -255,6 +262,10 @@ export function createEmpresa(req, res) {
     const existingUser = db.prepare('SELECT id FROM usuarios WHERE LOWER(usuario) = LOWER(?)').get(admin_usuario.trim());
     if (existingUser) {
       return res.status(400).json({ error: `El nombre de usuario "${admin_usuario.trim()}" ya está en uso.` });
+    }
+
+    if (adminEmail && emailInUse(adminEmail)) {
+      return res.status(400).json({ error: `El correo "${adminEmail}" ya está registrado en otra cuenta.` });
     }
 
     const plan = db.prepare('SELECT * FROM planes WHERE id = ?').get(plan_id);
@@ -275,10 +286,11 @@ export function createEmpresa(req, res) {
       const salt = bcrypt.genSaltSync(10);
       const passHash = bcrypt.hashSync(admin_contrasena, salt);
 
-      db.prepare(`
-        INSERT INTO usuarios (nombre, usuario, contrasena_hash, rol, estado, empresa_id)
-        VALUES (?, ?, ?, 'ADMINISTRADOR', 'ACTIVO', ?)
-      `).run(admin_nombre ? admin_nombre.trim() : `Admin ${nombre.trim()}`, admin_usuario.trim(), passHash, empresaId);
+      const adminRes = db.prepare(`
+        INSERT INTO usuarios (nombre, usuario, contrasena_hash, rol, estado, empresa_id, email)
+        VALUES (?, ?, ?, 'ADMINISTRADOR', 'ACTIVO', ?, ?)
+      `).run(admin_nombre ? admin_nombre.trim() : `Admin ${nombre.trim()}`, admin_usuario.trim(), passHash, empresaId, adminEmail);
+      const adminId = Number(adminRes.lastInsertRowid);
 
       // 3. Crear suscripción activa con 30 días de vigencia
       const hoy = new Date();
@@ -306,7 +318,7 @@ export function createEmpresa(req, res) {
         VALUES (?, ?, ?, 'USD', 'PAGADO', ?, 'ALTA MANUAL POR ADMINISTRADOR')
       `).run(empresaId, Number(subRes.lastInsertRowid), plan.precio, `pay_admin_init_${empresaId}_${Date.now()}`);
 
-      return empresaId;
+      return { empresaId, adminId };
     });
 
     const created = db.prepare(`
@@ -314,11 +326,22 @@ export function createEmpresa(req, res) {
       FROM empresas e
       JOIN planes p ON e.plan_id = p.id
       WHERE e.id = ?
-    `).get(result);
+    `).get(result.empresaId);
 
+    // Con correo del administrador: se crea su cuenta de Firebase y se le envía el enlace.
+    const firebase = adminEmail
+      ? await provisionFirebaseIdentity({
+          userId: result.adminId,
+          email: adminEmail,
+          displayName: admin_nombre ? admin_nombre.trim() : `Admin ${nombre.trim()}`
+        })
+      : null;
+
+    const baseMessage = `Empresa "${created.nombre}" dada de alta exitosamente con suscripción activa.`;
     return res.status(201).json({
-      message: `Empresa "${created.nombre}" dada de alta exitosamente con suscripción activa.`,
-      empresa: created
+      message: firebase ? `${baseMessage} ${firebase.message}` : baseMessage,
+      empresa: created,
+      firebase
     });
   } catch (error) {
     return res.status(500).json({ error: 'Error al registrar nueva empresa.', details: error.message });

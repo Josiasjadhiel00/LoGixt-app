@@ -14,6 +14,7 @@ export const UsersPage: React.FC = () => {
   const [nombre, setNombre] = useState('');
   const [usuario, setUsuario] = useState('');
   const [contrasena, setContrasena] = useState('');
+  const [email, setEmail] = useState('');
   const [rol, setRol] = useState<UserRole>('ALMACENERO');
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -44,16 +45,22 @@ export const UsersPage: React.FC = () => {
     setError(null);
 
     try {
-      await api.users.create({
+      const res = await api.users.create({
         nombre,
         usuario,
         contrasena,
         rol,
+        ...(email.trim() ? { email: email.trim() } : {}),
       });
+
+      if (res.firebase) {
+        alert(res.message);
+      }
 
       setNombre('');
       setUsuario('');
       setContrasena('');
+      setEmail('');
       setRol('ALMACENERO');
       setIsModalOpen(false);
       loadUsers();
@@ -286,6 +293,19 @@ export const UsersPage: React.FC = () => {
                   value={usuario}
                   onChange={(e) => setUsuario(e.target.value.toLowerCase().replace(/\s/g, ''))}
                   className="w-full px-3 py-2 text-xs bg-slate-900 border border-slate-800 text-white rounded-xl focus:border-blue-500 outline-none font-mono"
+                />
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-bold text-slate-300 uppercase mb-1">
+                  Correo electrónico (opcional)
+                </label>
+                <input
+                  type="email"
+                  placeholder="Ej. mgomez@empresa.com — recibirá un enlace para definir su contraseña"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  className="w-full px-3 py-2 text-xs bg-slate-900 border border-slate-800 text-white rounded-xl focus:border-blue-500 outline-none"
                 />
               </div>
 

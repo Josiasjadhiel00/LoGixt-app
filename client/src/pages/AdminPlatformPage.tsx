@@ -117,7 +117,8 @@ export const AdminPlatformPage: React.FC<AdminPlatformPageProps> = ({ onGoToWare
     plan_id: 2,
     admin_nombre: '',
     admin_usuario: '',
-    admin_contrasena: ''
+    admin_contrasena: '',
+    admin_email: ''
   });
 
   const [isCreateDeviceOpen, setIsCreateDeviceOpen] = useState(false);
@@ -238,8 +239,14 @@ export const AdminPlatformPage: React.FC<AdminPlatformPageProps> = ({ onGoToWare
   const handleCreateEmpresa = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      await api.admin.createEmpresa(newEmpresa);
+      const res = await api.admin.createEmpresa({
+        ...newEmpresa,
+        admin_email: newEmpresa.admin_email.trim() || undefined
+      });
       sound.playSuccess();
+      if (res.firebase) {
+        alert(res.message);
+      }
       setIsCreateEmpresaOpen(false);
       setNewEmpresa({
         nombre: '',
@@ -248,7 +255,8 @@ export const AdminPlatformPage: React.FC<AdminPlatformPageProps> = ({ onGoToWare
         plan_id: 2,
         admin_nombre: '',
         admin_usuario: '',
-        admin_contrasena: ''
+        admin_contrasena: '',
+        admin_email: ''
       });
       await loadAll();
     } catch (err: any) {
@@ -1796,6 +1804,13 @@ export const AdminPlatformPage: React.FC<AdminPlatformPageProps> = ({ onGoToWare
                     placeholder="Nombre Completo del Administrador"
                     value={newEmpresa.admin_nombre}
                     onChange={(e) => setNewEmpresa({ ...newEmpresa, admin_nombre: e.target.value })}
+                    className="w-full px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-white"
+                  />
+                  <input
+                    type="email"
+                    placeholder="Correo del administrador (opcional): recibirá un enlace para definir su contraseña"
+                    value={newEmpresa.admin_email}
+                    onChange={(e) => setNewEmpresa({ ...newEmpresa, admin_email: e.target.value })}
                     className="w-full px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-white"
                   />
                   <div className="grid grid-cols-2 gap-2">

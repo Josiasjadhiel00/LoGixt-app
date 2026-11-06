@@ -172,6 +172,7 @@ El frontend React/Vite se publica como sitio estático en Vercel. La API Express
    | `SUPERADMIN_INITIAL_PASSWORD` | Contraseña inicial fuerte si la instalación aún necesita crear el SuperAdmin |
    | `FIREBASE_PROJECT_ID` | `logixt-59b8c` |
    | `FIREBASE_SERVICE_ACCOUNT_JSON` | JSON privado de una cuenta de servicio del proyecto Firebase; guardarlo solo como secreto de Render |
+| `FIREBASE_WEB_API_KEY` | La misma clave pública de la app web Firebase (`VITE_FIREBASE_API_KEY`). Permite que el servidor envíe el correo para definir la contraseña a los usuarios nuevos con correo |
 
    Render asigna `PORT`; no fijes el puerto a un valor local. Mantén una sola instancia de la API para SQLite. Guarda todos los valores en el panel de Render, no en GitHub.
 6. Despliega y comprueba `https://logixt-api.onrender.com/api/health`. Debe responder `200` y `"database":"connected"`.

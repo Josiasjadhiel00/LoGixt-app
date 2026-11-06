@@ -1,5 +1,6 @@
 import bcrypt from 'bcryptjs';
 import db, { transaction } from '../db/connection.js';
+import { emailInUse, normalizeEmail, provisionFirebaseIdentity } from '../services/firebaseUsers.js';
 
 export function getAllUsers(req, res) {
   const isSuper = req.user.rol === 'SUPERADMIN';
@@ -36,8 +37,10 @@ export function getAllUsers(req, res) {
   }
 }
 
-export function createUser(req, res) {
+export async function createUser(req, res) {
   const { nombre, usuario, contrasena, rol } = req.body;
+  const rawEmail = typeof req.body.email === 'string' ? req.body.email.trim() : '';
+  const email = rawEmail ? normalizeEmail(rawEmail) : null;
   const isSuper = req.user.rol === 'SUPERADMIN';
   const empresaId = isSuper && req.body.empresa_id
     ? Number(req.body.empresa_id)
@@ -57,6 +60,10 @@ export function createUser(req, res) {
 
   if (contrasena.length < 6) {
     return res.status(400).json({ error: 'La contraseña debe tener mínimo 6 caracteres.' });
+  }
+
+  if (rawEmail && !email) {
+    return res.status(400).json({ error: 'El correo electrónico no es válido.' });
   }
 
   try {
@@ -83,16 +90,30 @@ export function createUser(req, res) {
       return res.status(400).json({ error: `El nombre de usuario "${usuario.trim()}" ya está en uso en la plataforma.` });
     }
 
+    if (email && emailInUse(email)) {
+      return res.status(400).json({ error: `El correo "${email}" ya está registrado en otra cuenta.` });
+    }
+
     const salt = bcrypt.genSaltSync(10);
     const passHash = bcrypt.hashSync(contrasena, salt);
 
     const result = db.prepare(`
-      INSERT INTO usuarios (nombre, usuario, contrasena_hash, rol, estado, empresa_id)
-      VALUES (?, ?, ?, ?, 'ACTIVO', ?)
-    `).run(nombre.trim(), usuario.trim(), passHash, rol, empresaId);
+      INSERT INTO usuarios (nombre, usuario, contrasena_hash, rol, estado, empresa_id, email)
+      VALUES (?, ?, ?, ?, 'ACTIVO', ?, ?)
+    `).run(nombre.trim(), usuario.trim(), passHash, rol, empresaId, email);
 
-    const newUser = db.prepare('SELECT id, nombre, usuario, rol, estado, empresa_id, fecha_creacion FROM usuarios WHERE id = ?').get(result.lastInsertRowid);
-    return res.status(201).json({ message: 'Usuario creado exitosamente.', user: newUser });
+    const newUser = db.prepare('SELECT id, nombre, usuario, rol, estado, empresa_id, email, fecha_creacion FROM usuarios WHERE id = ?').get(result.lastInsertRowid);
+
+    // Con correo: se crea la cuenta de Firebase y se envía el enlace para definir la contraseña.
+    const firebase = email
+      ? await provisionFirebaseIdentity({ userId: Number(result.lastInsertRowid), email, displayName: nombre.trim() })
+      : null;
+
+    return res.status(201).json({
+      message: firebase ? `Usuario creado exitosamente. ${firebase.message}` : 'Usuario creado exitosamente.',
+      user: newUser,
+      firebase
+    });
   } catch (error) {
     return res.status(500).json({
       error: 'Error al registrar usuario.',

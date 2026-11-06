@@ -637,8 +637,8 @@ export const api = {
   // Usuarios (Admin de Almacén)
   users: {
     getAll: () => request<{ users: User[] }>('/users'),
-    create: (data: { nombre: string; usuario: string; contrasena: string; rol: string }) =>
-      request<{ message: string; user: User }>('/users', {
+    create: (data: { nombre: string; usuario: string; contrasena: string; rol: string; email?: string }) =>
+      request<{ message: string; user: User; firebase?: { status: string; emailSent: boolean; message: string } | null }>('/users', {
         method: 'POST',
         body: JSON.stringify(data),
       }),
@@ -707,8 +707,9 @@ export const api = {
       admin_nombre: string;
       admin_usuario: string;
       admin_contrasena: string;
+      admin_email?: string;
     }) =>
-      request<{ message: string; empresa: Empresa }>('/admin/empresas', {
+      request<{ message: string; empresa: Empresa; firebase?: { status: string; emailSent: boolean; message: string } | null }>('/admin/empresas', {
         method: 'POST',
         body: JSON.stringify(data),
       }),

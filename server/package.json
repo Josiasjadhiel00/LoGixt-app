@@ -13,7 +13,8 @@
     "clean:demo": "node src/scripts/clean_demo_data.js",
     "test:sync": "node test_sync_offline.cjs",
     "test:google-drive": "node test_google_drive.cjs",
-    "test": "node test_backend.js"
+    "test": "node test_backend.js",
+    "test:firebase-users": "node test_firebase_users.js"
   },
   "dependencies": {
     "bcryptjs": "^3.0.3",
